@@ -1,0 +1,27 @@
+{
+  "name": "gestionale-affittacamere",
+  "version": "1.0.0",
+  "description": "Gestionale per affittacamere in Ticino: prenotazioni, ospiti, conti, contabilità, import da Logico",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "build": "npm --prefix client install --include=dev && npm --prefix client run build",
+    "seed": "node server/seed.js",
+    "dev": "node --watch server/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.3.0",
+    "multer": "^2.5.0",
+    "swissqrbill": "^4.4.4",
+    "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
