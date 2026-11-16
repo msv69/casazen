@@ -70,7 +70,12 @@ function auth(req, res, next) {
 const admin = (req, res, next) => (req.user.role === 'admin' ? next() : res.status(403).json({ error: 'Funzione riservata all\'amministratore' }));
 
 app.use('/api', (req, res, next) => (req.path === '/login' || req.path === '/health' ? next() : auth(req, res, next)));
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/health', (req, res) => res.json({
+  ok: true,
+  interfaccia: fs.existsSync(path.join(__dirname, '..', 'client', 'dist', 'index.html')),
+  database: DB_PATH,
+  utenti: db.prepare('SELECT COUNT(*) n FROM users').get().n,
+}));
 
 app.post('/api/logout', (req, res) => {
   db.prepare('DELETE FROM sessions WHERE token = ?').run(req.cookies.sid);
@@ -563,10 +568,31 @@ app.use((err, req, res, next) => {
 
 // frontend
 const DIST = path.join(__dirname, '..', 'client', 'dist');
-if (fs.existsSync(DIST)) {
-  app.use(express.static(DIST, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.endsWith('sw.js') || p.endsWith('.webmanifest')) res.set('Cache-Control', 'no-cache'); } }));
-  app.get(/^(?!\/api).*/, (req, res) => res.sendFile(path.join(DIST, 'index.html')));
+const HAS_UI = fs.existsSync(path.join(DIST, 'index.html'));
+console.log(HAS_UI ? `Interfaccia trovata in ${DIST}` : `ATTENZIONE: interfaccia non compilata (manca ${DIST}). Esegui "npm run build".`);
+if (HAS_UI) {
+  app.use(express.static(DIST, {
+    index: false,
+    setHeaders: (res, p) => {
+      // i file in /assets hanno l'hash nel nome: si possono tenere in cache a lungo; tutto il resto va sempre ricontrollato
+      if (p.includes(`${path.sep}assets${path.sep}`)) res.set('Cache-Control', 'public, max-age=31536000, immutable');
+      else res.set('Cache-Control', 'no-cache');
+    },
+  }));
 }
+// un file statico mancante (es. /assets/vecchio.js) deve dare 404, non la pagina HTML
+app.get(/\.[a-z0-9]{2,5}$/i, (req, res) => res.status(404).type('text').send('File non trovato'));
+app.get(/^(?!\/api).*/, (req, res) => {
+  if (!HAS_UI) {
+    return res.status(503).type('html').send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reception</title><body style="font-family:system-ui,sans-serif;max-width:560px;margin:60px auto;padding:0 16px;line-height:1.5;color:#263033">
+<h1 style="font-size:1.4rem">L'interfaccia non è stata compilata</h1>
+<p>Il server funziona, ma manca la cartella <code>client/dist</code>. Esegui <code>npm run build</code> prima di <code>npm start</code>.
+Su Railway controlla che venga usato il <code>Dockerfile</code> del progetto (file <code>railway.json</code> nella radice del repository).</p></body>`);
+  }
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(path.join(DIST, 'index.html'));
+});
 
 const PORT = process.env.PORT || 3000;
 if (require.main === module) app.listen(PORT, () => console.log(`Gestionale in ascolto su http://localhost:${PORT}`));
