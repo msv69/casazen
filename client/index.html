@@ -13,9 +13,47 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet" />
   <title>Reception</title>
+  <style>
+    #boot { font-family: system-ui, sans-serif; color: #5B676B; text-align: center; padding: 30vh 16px 0; }
+    #boot-err { display: none; font-family: system-ui, sans-serif; max-width: 560px; margin: 12vh auto; padding: 20px; line-height: 1.5; color: #263033; background: #fff; border: 1px solid #D5DAD7; border-left: 4px solid #A3423A; border-radius: 8px; }
+    #boot-err h1 { font-size: 1.2rem; margin: 0 0 8px; }
+    #boot-err pre { white-space: pre-wrap; background: #F3F4F1; padding: 8px; border-radius: 6px; font-size: .85rem; }
+    #boot-err button { font: inherit; padding: 8px 16px; border: 0; border-radius: 6px; background: #1F5B6E; color: #fff; cursor: pointer; }
+  </style>
+  <script>
+    // Se l'app non parte, mostra il motivo invece di una pagina bianca
+    window.__bootFail = function (msg) {
+      var box = document.getElementById('boot-err');
+      if (!box || window.__appStarted) return;
+      document.getElementById('boot-msg').textContent = msg;
+      box.style.display = 'block';
+      var b = document.getElementById('boot'); if (b) b.style.display = 'none';
+    };
+    window.__resetApp = function () {
+      var done = function () { location.reload(); };
+      try {
+        var jobs = [];
+        if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+        if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+        Promise.all(jobs).then(done, done);
+      } catch (e) { done(); }
+    };
+    window.addEventListener('error', function (e) {
+      if (e.target && e.target.tagName === 'SCRIPT') window.__bootFail('Non riesco a caricare il file ' + e.target.src + '. Di solito succede dopo un aggiornamento: tocca "Ricarica pulita".');
+      else if (e.message) window.__bootFail(e.message);
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) { window.__bootFail(String(e.reason && e.reason.message || e.reason)); });
+    setTimeout(function () { window.__bootFail("L'app non si è avviata entro 15 secondi. Controlla la connessione, poi tocca \"Ricarica pulita\"."); }, 15000);
+  </script>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root"><div id="boot">Caricamento…</div></div>
+  <div id="boot-err" role="alert">
+    <h1>L'app non si è avviata</h1>
+    <pre id="boot-msg"></pre>
+    <p>Se il problema resta, apri <a href="/api/health">/api/health</a> e inviami quello che vedi.</p>
+    <button onclick="__resetApp()">Ricarica pulita</button>
+  </div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
