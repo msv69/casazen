@@ -25,15 +25,34 @@ app.use((req, res, next) => {
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 // ---------- utenti e sessioni ----------
+// toglie spazi e virgolette finite per errore nel valore di una variabile d'ambiente
+const envValue = (v) => (v == null ? '' : String(v).trim().replace(/^(["'])(.*)\1$/, '$2'));
+
 function ensureAdmin() {
-  if (db.prepare('SELECT COUNT(*) n FROM users').get().n > 0) return;
-  const username = process.env.ADMIN_USER || 'admin';
-  let password = process.env.ADMIN_PASSWORD;
+  const username = (envValue(process.env.ADMIN_USER) || 'admin').toLowerCase();
+  const envPassword = envValue(process.env.ADMIN_PASSWORD);
+  const reset = /^(1|true|si|sì|yes)$/i.test(envValue(process.env.ADMIN_RESET));
+  const count = db.prepare('SELECT COUNT(*) n FROM users').get().n;
+
+  if (count > 0 && !reset) {
+    console.log(`Utenti presenti: ${count}. Amministratore: ${db.prepare("SELECT username FROM users WHERE role = 'admin' ORDER BY id LIMIT 1").get()?.username}`);
+    return;
+  }
+  let password = envPassword;
   if (!password) {
     password = crypto.randomBytes(9).toString('base64url');
-    console.log(`\n*** Utente iniziale creato: ${username} / ${password}  (cambia la password dopo il primo accesso)\n`);
+    console.log(`\n*** Password generata per ${username}: ${password}  (cambiala dopo il primo accesso)\n`);
   }
-  db.prepare('INSERT INTO users (username, name, password_hash, role) VALUES (?, ?, ?, ?)').run(username, 'Amministratore', bcrypt.hashSync(password, 10), 'admin');
+  const hash = bcrypt.hashSync(password, 10);
+  const existing = db.prepare('SELECT id FROM users WHERE lower(username) = ?').get(username);
+  if (existing) {
+    db.prepare("UPDATE users SET password_hash = ?, role = 'admin' WHERE id = ?").run(hash, existing.id);
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(existing.id);
+    console.log(`*** Password dell'utente "${username}" reimpostata da ADMIN_PASSWORD. Ora togli la variabile ADMIN_RESET.`);
+  } else {
+    db.prepare('INSERT INTO users (username, name, password_hash, role) VALUES (?, ?, ?, ?)').run(username, 'Amministratore', hash, 'admin');
+    console.log(`*** Utente amministratore "${username}" creato${envPassword ? ' con la password di ADMIN_PASSWORD' : ''}.`);
+  }
 }
 ensureAdmin();
 
@@ -48,7 +67,7 @@ app.post('/api/login', wrap((req, res) => {
   if (Date.now() - a.t > 15 * 60000) { a.n = 0; a.t = Date.now(); }
   if (a.n >= 10) throw bad('Troppi tentativi. Riprova tra 15 minuti.', 429);
   const { username, password } = req.body || {};
-  const u = db.prepare('SELECT * FROM users WHERE username = ?').get(String(username || '').trim());
+  const u = db.prepare('SELECT * FROM users WHERE lower(username) = ?').get(String(username || '').trim().toLowerCase());
   if (!u || !bcrypt.compareSync(String(password || ''), u.password_hash)) {
     a.n++; loginAttempts.set(ip, a);
     throw bad('Nome utente o password errati', 401);
@@ -96,9 +115,9 @@ app.get('/api/users', admin, (req, res) => res.json(db.prepare('SELECT id, usern
 app.post('/api/users', admin, wrap((req, res) => {
   const { username, name, password, role } = req.body;
   if (!username || !password || password.length < 8) throw bad('Inserisci nome utente e una password di almeno 8 caratteri');
-  if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) throw bad('Nome utente già in uso');
+  if (db.prepare('SELECT 1 FROM users WHERE lower(username) = ?').get(String(username).trim().toLowerCase())) throw bad('Nome utente già in uso');
   const id = db.prepare('INSERT INTO users (username, name, password_hash, role) VALUES (?, ?, ?, ?)')
-    .run(username.trim(), name || username, bcrypt.hashSync(password, 10), role === 'admin' ? 'admin' : 'reception').lastInsertRowid;
+    .run(username.trim().toLowerCase(), name || username, bcrypt.hashSync(password, 10), role === 'admin' ? 'admin' : 'reception').lastInsertRowid;
   res.json({ id });
 }));
 app.delete('/api/users/:id', admin, wrap((req, res) => {
