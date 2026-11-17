@@ -62,7 +62,8 @@ Senza `ADMIN_PASSWORD` al primo avvio viene generata una password casuale, stamp
 1. Carica la cartella in un repository GitHub (privato).
 2. Su Railway crea un servizio **Deploy from GitHub repo**. Il `Dockerfile` e `railway.json` sono già pronti.
 3. Aggiungi un **Volume** montato su `/data`. Lì vive il database SQLite: senza volume i dati si perdono a ogni deploy.
-4. Variabili: `ADMIN_USER` (facoltativa, default `admin`) e `ADMIN_PASSWORD`.
+4. Variabili: `ADMIN_PASSWORD` e, se vuoi un nome diverso da `admin`, `ADMIN_USER`.
+   La password viene usata solo alla creazione dell'utente. Per reimpostarla in seguito aggiungi `ADMIN_RESET=1`, ripubblica, accedi e poi togli `ADMIN_RESET`.
 5. Genera un dominio pubblico (o collega il tuo) e accedi.
 
 Dopo il primo accesso: cambia la password, compila **Impostazioni → Struttura e tasse** (indirizzo, IBAN, numero IVA, OTR) e crea le camere.
