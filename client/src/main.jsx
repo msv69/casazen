@@ -41,7 +41,7 @@ function Login({ onLogin }) {
         <div className="keytag"><span className="tag">R</span></div>
         <h1>Reception</h1>
         <p className="muted">Accedi per gestire camere, ospiti e contabilità.</p>
-        <label className="f">Nome utente<input autoFocus autoComplete="username" value={u} onChange={(e) => setU(e.target.value)} /></label>
+        <label className="f">Nome utente<input autoFocus autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={u} onChange={(e) => setU(e.target.value)} /></label>
         <label className="f">Password<input type="password" autoComplete="current-password" value={p} onChange={(e) => setP(e.target.value)} /></label>
         {err && <div className="alert err">{err}</div>}
         <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>Accedi</button>
